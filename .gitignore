@@ -1,0 +1,25 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# IDE / Editors
+.vscode/
+.idea/
+
+# Testing & Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
