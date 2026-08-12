@@ -1,6 +1,3 @@
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
-
 from app.crud.course import (
     create_course,
     delete_course,
@@ -12,11 +9,17 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.course import CourseCreate, CourseResponseSchema, CourseUpdate
 from app.security.auth import require_admin, require_authenticated_user
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
 
-@router.post("/courses/", response_model=CourseResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/courses/",
+    response_model=CourseResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_course_endpoint(
     course: CourseCreate,
     db: Session = Depends(get_db),

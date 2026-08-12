@@ -1,11 +1,10 @@
 from importlib import import_module
 from logging.config import fileConfig
 
-from sqlalchemy import create_engine, pool
-
 from alembic import context
 from app.database import DATABASE_URL, Base
 from app.models import *
+from sqlalchemy import create_engine, pool
 
 _model_modules = (
     "college",

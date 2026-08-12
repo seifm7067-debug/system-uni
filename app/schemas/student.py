@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 class StudentBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=150)
     department_id: int = Field(..., gt=0)
-    age: int = Field(..., gt=0, le=120)
+    age: int | None = Field(default=None, gt=0, le=120)
     email: EmailStr
 
 

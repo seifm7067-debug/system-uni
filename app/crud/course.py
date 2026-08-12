@@ -1,10 +1,9 @@
+from app.models import Course
+from app.schemas import CourseCreate, CourseUpdate
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
-
-from app.models import Course
-from app.schemas import CourseCreate, CourseUpdate
 
 
 def create_course(db: Session, course: CourseCreate) -> Course:
@@ -33,7 +32,9 @@ def update_course(db: Session, course_update: CourseUpdate, course_id: int) -> C
     result = db.execute(statement)
     course = result.scalar_one_or_none()
     if course is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+        )
 
     if course_update.name is not None:
         course.name = course_update.name
@@ -65,7 +66,9 @@ def read_course(db: Session, course_id: int) -> Course:
     result = db.execute(statement)
     course = result.scalar_one_or_none()
     if course is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+        )
     return course
 
 
@@ -80,7 +83,9 @@ def delete_course(db: Session, course_id: int) -> dict:
     result = db.execute(statement)
     course = result.scalar_one_or_none()
     if course is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+        )
 
     db.delete(course)
     try:

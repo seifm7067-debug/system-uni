@@ -1,6 +1,3 @@
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
-
 from app.crud.department import (
     create_department,
     delete_department,
@@ -16,11 +13,17 @@ from app.schemas.department import (
     DepartmentUpdate,
 )
 from app.security.auth import require_admin, require_authenticated_user
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
 
-@router.post("/departments/", response_model=DepartmentResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/departments/",
+    response_model=DepartmentResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_department_endpoint(
     department: DepartmentCreate,
     db: Session = Depends(get_db),

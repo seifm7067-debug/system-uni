@@ -1,13 +1,14 @@
+from app.models import CourseSchedule
+from app.schemas import CourseScheduleCreate, CourseScheduleUpdate
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import CourseSchedule
-from app.schemas import CourseScheduleCreate, CourseScheduleUpdate
 
-
-def create_course_schedule(db: Session, course_schedule: CourseScheduleCreate) -> CourseSchedule:
+def create_course_schedule(
+    db: Session, course_schedule: CourseScheduleCreate
+) -> CourseSchedule:
     new_course_schedule = CourseSchedule(**course_schedule.model_dump())
     db.add(new_course_schedule)
     try:
@@ -37,7 +38,9 @@ def update_course_schedule(
     result = db.execute(statement)
     course_schedule = result.scalar_one_or_none()
     if course_schedule is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course schedule not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course schedule not found"
+        )
 
     start_time = schedule_update.start_time or course_schedule.start_time
     end_time = schedule_update.end_time or course_schedule.end_time
@@ -83,11 +86,15 @@ def read_course_schedule(db: Session, course_schedule_id: int) -> CourseSchedule
     result = db.execute(statement)
     course_schedule = result.scalar_one_or_none()
     if course_schedule is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course schedule not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course schedule not found"
+        )
     return course_schedule
 
 
-def read_course_schedules(db: Session, skip: int = 0, limit: int = 100) -> list[CourseSchedule]:
+def read_course_schedules(
+    db: Session, skip: int = 0, limit: int = 100
+) -> list[CourseSchedule]:
     statement = select(CourseSchedule).offset(skip).limit(limit)
     result = db.execute(statement)
     return result.scalars().all()
@@ -98,7 +105,9 @@ def delete_course_schedule(db: Session, course_schedule_id: int) -> dict:
     result = db.execute(statement)
     course_schedule = result.scalar_one_or_none()
     if course_schedule is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course schedule not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course schedule not found"
+        )
 
     db.delete(course_schedule)
     try:

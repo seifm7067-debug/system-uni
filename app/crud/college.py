@@ -1,10 +1,9 @@
+from app.models import College
+from app.schemas import CollegeCreate, CollegeUpdate
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
-
-from app.models import College
-from app.schemas import CollegeCreate, CollegeUpdate
 
 
 def create_college(db: Session, college: CollegeCreate) -> College:
@@ -28,12 +27,16 @@ def create_college(db: Session, college: CollegeCreate) -> College:
         )
 
 
-def update_college(db: Session, college_update: CollegeUpdate, college_id: int) -> College:
+def update_college(
+    db: Session, college_update: CollegeUpdate, college_id: int
+) -> College:
     statement = select(College).where(College.id == college_id)
     result = db.execute(statement)
     college = result.scalar_one_or_none()
     if college is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="College not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="College not found"
+        )
 
     if college_update.name is not None:
         college.name = college_update.name
@@ -63,7 +66,9 @@ def read_college(db: Session, college_id: int) -> College:
     result = db.execute(statement)
     college = result.scalar_one_or_none()
     if college is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="College not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="College not found"
+        )
     return college
 
 
@@ -78,7 +83,9 @@ def delete_college(db: Session, college_id: int) -> dict:
     result = db.execute(statement)
     college = result.scalar_one_or_none()
     if college is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="College not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="College not found"
+        )
 
     db.delete(college)
     try:

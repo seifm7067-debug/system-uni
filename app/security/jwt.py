@@ -1,7 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
 import jwt
-
 from app.config import settings
 
 SECRET_KEY = settings.secret_key
@@ -12,8 +11,7 @@ ALGORITHM = "HS256"
 def create_access_token(user_id: int) -> str:
     payload = {
         "sub": str(user_id),
-        "exp": datetime.now(UTC)
-        + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+        "exp": datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -30,5 +28,5 @@ def decode_access_token(token: str) -> int | None:
         if sub is None:
             return None
         return int(sub)
-    except (jwt.PyJWTError, ValueError, TypeError):
+    except jwt.PyJWTError, ValueError, TypeError:
         return None

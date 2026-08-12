@@ -1,6 +1,3 @@
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
-
 from app.crud.courseschedule import (
     create_course_schedule,
     delete_course_schedule,
@@ -16,11 +13,17 @@ from app.schemas.courseschedule import (
     CourseScheduleUpdate,
 )
 from app.security.auth import require_admin, require_authenticated_user
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
 
-@router.post("/course-schedules/", response_model=CourseScheduleResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/course-schedules/",
+    response_model=CourseScheduleResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_course_schedule_endpoint(
     course_schedule: CourseScheduleCreate,
     db: Session = Depends(get_db),
@@ -29,7 +32,10 @@ def create_course_schedule_endpoint(
     return create_course_schedule(db, course_schedule)
 
 
-@router.get("/course-schedules/{course_schedule_id}", response_model=CourseScheduleResponseSchema)
+@router.get(
+    "/course-schedules/{course_schedule_id}",
+    response_model=CourseScheduleResponseSchema,
+)
 def get_course_schedule(
     course_schedule_id: int,
     db: Session = Depends(get_db),
@@ -48,7 +54,10 @@ def get_course_schedules(
     return read_course_schedules(db, skip=skip, limit=limit)
 
 
-@router.put("/course-schedules/{course_schedule_id}", response_model=CourseScheduleResponseSchema)
+@router.put(
+    "/course-schedules/{course_schedule_id}",
+    response_model=CourseScheduleResponseSchema,
+)
 def update_course_schedule_endpoint(
     course_schedule_id: int,
     course_schedule: CourseScheduleUpdate,

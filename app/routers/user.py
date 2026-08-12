@@ -1,6 +1,3 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy.orm import Session
-
 from app.crud.student import get_current_student
 from app.crud.user import (
     delete_user,
@@ -24,6 +21,8 @@ from app.schemas.user import (
     UserUpdate,
 )
 from app.security.auth import get_current_user, require_admin
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -51,7 +50,9 @@ def get_current_student_endpoint(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     student = get_current_student(current_user.id, db)
     if student is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student record not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student record not found"
+        )
     return student
 
 
@@ -93,7 +94,9 @@ def delete_user_endpoint(
     return delete_user(db, user_id)
 
 
-@router.post("/users/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/users/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
 @limiter.limit("5/minute")
 def register_user_endpoint(
     request: Request,

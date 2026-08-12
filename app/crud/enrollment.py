@@ -1,11 +1,10 @@
+from app.models import Enrollment, Student, User
+from app.models.user import UserRole
+from app.schemas import EnrollmentCreate, EnrollmentUpdate
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
-
-from app.models import Enrollment, Student, User
-from app.models.user import UserRole
-from app.schemas import EnrollmentCreate, EnrollmentUpdate
 
 
 def create_enrollment(db: Session, enrollment: EnrollmentCreate) -> Enrollment:
@@ -38,7 +37,9 @@ def update_enrollment(
     result = db.execute(statement)
     enrollment = result.scalar_one_or_none()
     if enrollment is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found"
+        )
 
     if enrollment_update.student_id is not None:
         enrollment.student_id = enrollment_update.student_id
@@ -82,7 +83,9 @@ def read_enrollment(db: Session, enrollment_id: int, user: User) -> Enrollment:
     result = db.execute(statement)
     enrollment = result.scalar_one_or_none()
     if enrollment is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found"
+        )
 
     return enrollment
 
@@ -110,7 +113,9 @@ def delete_enrollment(db: Session, enrollment_id: int) -> dict:
     result = db.execute(statement)
     enrollment = result.scalar_one_or_none()
     if enrollment is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found"
+        )
 
     db.delete(enrollment)
     try:

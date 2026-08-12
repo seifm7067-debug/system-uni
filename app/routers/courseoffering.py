@@ -1,6 +1,3 @@
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
-
 from app.crud.courseoffering import (
     create_course_offering,
     delete_course_offering,
@@ -16,11 +13,17 @@ from app.schemas.courseoffering import (
     CourseOfferingUpdate,
 )
 from app.security.auth import require_admin, require_authenticated_user
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
 
-@router.post("/course-offerings/", response_model=CourseOfferingResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/course-offerings/",
+    response_model=CourseOfferingResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_course_offering_endpoint(
     course_offering: CourseOfferingCreate,
     db: Session = Depends(get_db),
@@ -29,7 +32,10 @@ def create_course_offering_endpoint(
     return create_course_offering(db, course_offering)
 
 
-@router.get("/course-offerings/{course_offering_id}", response_model=CourseOfferingResponseSchema)
+@router.get(
+    "/course-offerings/{course_offering_id}",
+    response_model=CourseOfferingResponseSchema,
+)
 def get_course_offering(
     course_offering_id: int,
     db: Session = Depends(get_db),
@@ -48,7 +54,10 @@ def get_course_offerings(
     return read_course_offerings(db, skip=skip, limit=limit)
 
 
-@router.put("/course-offerings/{course_offering_id}", response_model=CourseOfferingResponseSchema)
+@router.put(
+    "/course-offerings/{course_offering_id}",
+    response_model=CourseOfferingResponseSchema,
+)
 def update_course_offering_endpoint(
     course_offering_id: int,
     course_offering: CourseOfferingUpdate,

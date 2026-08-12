@@ -1,13 +1,14 @@
+from app.models import CourseOffering
+from app.schemas import CourseOfferingCreate, CourseOfferingUpdate
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import CourseOffering
-from app.schemas import CourseOfferingCreate, CourseOfferingUpdate
 
-
-def create_course_offering(db: Session, course_offering: CourseOfferingCreate) -> CourseOffering:
+def create_course_offering(
+    db: Session, course_offering: CourseOfferingCreate
+) -> CourseOffering:
     new_course_offering = CourseOffering(**course_offering.model_dump())
     db.add(new_course_offering)
     try:
@@ -37,7 +38,9 @@ def update_course_offering(
     result = db.execute(statement)
     course_offering = result.scalar_one_or_none()
     if course_offering is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course offering not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course offering not found"
+        )
 
     if course_offering_update.course_id is not None:
         course_offering.course_id = course_offering_update.course_id
@@ -73,11 +76,15 @@ def read_course_offering(db: Session, course_offering_id: int) -> CourseOffering
     result = db.execute(statement)
     course_offering = result.scalar_one_or_none()
     if course_offering is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course offering not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course offering not found"
+        )
     return course_offering
 
 
-def read_course_offerings(db: Session, skip: int = 0, limit: int = 100) -> list[CourseOffering]:
+def read_course_offerings(
+    db: Session, skip: int = 0, limit: int = 100
+) -> list[CourseOffering]:
     statement = select(CourseOffering).offset(skip).limit(limit)
     result = db.execute(statement)
     return result.scalars().all()
@@ -88,7 +95,9 @@ def delete_course_offering(db: Session, course_offering_id: int) -> dict:
     result = db.execute(statement)
     course_offering = result.scalar_one_or_none()
     if course_offering is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course offering not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course offering not found"
+        )
 
     db.delete(course_offering)
     try:

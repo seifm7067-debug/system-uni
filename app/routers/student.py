@@ -1,6 +1,3 @@
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
-
 from app.crud.student import (
     create_student,
     delete_student,
@@ -13,11 +10,17 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.student import StudentCreate, StudentResponseSchema, StudentUpdate
 from app.security.auth import require_admin, require_admin_or_user
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
 
-@router.post("/students/", response_model=StudentResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/students/",
+    response_model=StudentResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_student_endpoint(
     student: StudentCreate,
     db: Session = Depends(get_db),
@@ -64,7 +67,9 @@ def delete_student_endpoint(
     return delete_student(db, student_id)
 
 
-@router.post("/students/{student_id}/link-user/{user_id}", response_model=StudentResponseSchema)
+@router.post(
+    "/students/{student_id}/link-user/{user_id}", response_model=StudentResponseSchema
+)
 def link_student_user_endpoint(
     student_id: int,
     user_id: int,

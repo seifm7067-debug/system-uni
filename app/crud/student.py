@@ -1,11 +1,10 @@
+from app.models import Student, User
+from app.models.user import UserRole
+from app.schemas import StudentCreate, StudentUpdate
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
-
-from app.models import Student, User
-from app.models.user import UserRole
-from app.schemas import StudentCreate, StudentUpdate
 
 
 def create_student(db: Session, student: StudentCreate) -> Student:
@@ -29,12 +28,16 @@ def create_student(db: Session, student: StudentCreate) -> Student:
         )
 
 
-def update_student(db: Session, student_update: StudentUpdate, student_id: int) -> Student:
+def update_student(
+    db: Session, student_update: StudentUpdate, student_id: int
+) -> Student:
     statement = select(Student).where(Student.id == student_id)
     result = db.execute(statement)
     student = result.scalar_one_or_none()
     if student is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student not found"
+        )
 
     if student_update.name is not None:
         student.name = student_update.name
@@ -74,7 +77,9 @@ def read_student(db: Session, student_id: int, user: User) -> Student:
     result = db.execute(statement)
     student = result.scalar_one_or_none()
     if student is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student not found"
+        )
 
     return student
 
@@ -102,7 +107,9 @@ def delete_student(db: Session, student_id: int) -> dict:
     result = db.execute(statement)
     student = result.scalar_one_or_none()
     if student is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student not found"
+        )
 
     db.delete(student)
     try:
@@ -128,14 +135,18 @@ def link_student_to_user(db: Session, student_id: int, user_id: int) -> Student:
     student = result.scalar_one_or_none()
 
     if student is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student not found"
+        )
 
     statement = select(User).where(User.id == user_id)
     result = db.execute(statement)
     user = result.scalar_one_or_none()
 
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     if student.user_id is not None:
         raise HTTPException(

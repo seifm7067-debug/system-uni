@@ -1,8 +1,3 @@
-from fastapi import HTTPException
-from sqlalchemy import select
-from sqlalchemy.exc import DataError, IntegrityError
-from sqlalchemy.orm import Session
-
 from app.models.user import User, UserRole
 from app.schemas.tokenresponse import TokenResponse
 from app.schemas.user import (
@@ -14,17 +9,27 @@ from app.schemas.user import (
 )
 from app.security.jwt import create_access_token
 from app.security.password import hash_password, verify_password
+from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.exc import DataError, IntegrityError
+from sqlalchemy.orm import Session
 
 
-def ensure_admin_remains(db: Session, user: User, next_role: UserRole | None = None) -> None:
+def ensure_admin_remains(
+    db: Session, user: User, next_role: UserRole | None = None
+) -> None:
     if user.role != UserRole.ADMIN or next_role == UserRole.ADMIN:
         return
 
-    admin_ids = db.execute(
-        select(User.id).where(User.role == UserRole.ADMIN).with_for_update()
-    ).scalars().all()
+    admin_ids = (
+        db.execute(select(User.id).where(User.role == UserRole.ADMIN).with_for_update())
+        .scalars()
+        .all()
+    )
     if len(admin_ids) <= 1:
-        raise HTTPException(status_code=400, detail="Cannot remove the last admin account")
+        raise HTTPException(
+            status_code=400, detail="Cannot remove the last admin account"
+        )
 
 
 def register_user(db: Session, user: UserRegister) -> User:
@@ -88,7 +93,9 @@ def update_user(db: Session, user_update: UserUpdate, user_id: int) -> User:
         raise HTTPException(status_code=422, detail="Invalid user input data")
 
 
-def update_user_me(db: Session, user_update: UserSelfUpdate, current_user: User) -> User:
+def update_user_me(
+    db: Session, user_update: UserSelfUpdate, current_user: User
+) -> User:
     if user_update.username is not None:
         current_user.username = user_update.username
     if user_update.email is not None:
@@ -131,7 +138,9 @@ def delete_user(db: Session, user_id: int) -> dict:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Cannot delete user due to existing relationships")
+        raise HTTPException(
+            status_code=409, detail="Cannot delete user due to existing relationships"
+        )
     return {"message": "User deleted successfully"}
 
 

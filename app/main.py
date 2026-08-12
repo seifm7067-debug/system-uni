@@ -1,10 +1,3 @@
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from sqlalchemy.exc import DataError
-
 from app.config import settings
 from app.limiter import limiter
 from app.logging_config import setup_logging
@@ -21,6 +14,12 @@ from app.routers import (
     teacher,
     user,
 )
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from sqlalchemy.exc import DataError
 
 setup_logging()
 

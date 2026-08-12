@@ -1,6 +1,3 @@
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
-
 from app.crud.college import (
     create_college,
     delete_college,
@@ -12,11 +9,17 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.college import CollegeCreate, CollegeResponseSchema, CollegeUpdate
 from app.security.auth import require_admin, require_authenticated_user
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
 
-@router.post("/colleges/", response_model=CollegeResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/colleges/",
+    response_model=CollegeResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_college_endpoint(
     college: CollegeCreate,
     db: Session = Depends(get_db),

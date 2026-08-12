@@ -1,6 +1,3 @@
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
-
 from app.crud.teacher import (
     create_teacher,
     delete_teacher,
@@ -12,11 +9,17 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.teacher import TeacherCreate, TeacherResponseSchema, TeacherUpdate
 from app.security.auth import require_admin, require_authenticated_user
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
 
-@router.post("/teachers/", response_model=TeacherResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/teachers/",
+    response_model=TeacherResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_teacher_endpoint(
     teacher: TeacherCreate,
     db: Session = Depends(get_db),

@@ -1,6 +1,3 @@
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
-
 from app.crud.enrollment import (
     create_enrollment,
     delete_enrollment,
@@ -12,11 +9,17 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas import EnrollmentCreate, EnrollmentResponseSchema, EnrollmentUpdate
 from app.security.auth import require_admin, require_admin_or_user
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
 
-@router.post("/enrollments/", response_model=EnrollmentResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/enrollments/",
+    response_model=EnrollmentResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_enrollment_endpoint(
     enrollment: EnrollmentCreate,
     db: Session = Depends(get_db),

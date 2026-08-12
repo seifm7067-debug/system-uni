@@ -39,11 +39,25 @@ docker compose up --build
 docker compose down
 ```
 
-## ترحيل قاعدة البيانات
+## ترحيل قاعدة البيانات وإعداد أدمن النظام
 
 ```powershell
 uv run alembic upgrade head
 ```
+
+إنشاء حساب المسؤول الأول (Bootstrap Admin):
+
+```powershell
+# عبر وسائط CLI الفردية (تفاعليًا بطلب كلمة المرور في حال إزالتها):
+uv run python -m app.cli create-admin --email admin@example.com --username admin
+
+# أو عبر متغيرات البيئة (مناسب لـ Docker و CI):
+$env:ADMIN_EMAIL="admin@example.com"
+$env:ADMIN_USERNAME="admin"
+$env:ADMIN_PASSWORD="SuperSecretAdminPass123!"
+uv run python -m app.cli create-admin
+```
+
 
 ## الاختبارات والفحص
 

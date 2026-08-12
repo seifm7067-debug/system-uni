@@ -1,9 +1,9 @@
 import logging
 
-from redis import Redis
+from app.config import settings
 from redis.exceptions import RedisError
 
-from app.config import settings
+from redis import Redis
 
 logger = logging.getLogger(__name__)
 
@@ -20,5 +20,8 @@ def get_redis_client() -> Redis | None:
         _redis_client = client
         return _redis_client
     except RedisError as exc:
-        logger.warning("Redis server is unreachable (%s). Features depending on Redis will run in fallback mode.", exc)
+        logger.warning(
+            "Redis server is unreachable (%s). Features depending on Redis will run in fallback mode.",
+            exc,
+        )
         return None

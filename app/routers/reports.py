@@ -1,11 +1,10 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-
 from app.database import get_db
 from app.models.user import User
 from app.security.auth import require_admin_or_user
 from app.services.reports import generate_student_transcript
 from app.workers.tasks import process_async_report
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -18,7 +17,9 @@ def get_transcript_endpoint(
 ):
     transcript = generate_student_transcript(db, student_id)
     if transcript is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student not found"
+        )
     return transcript
 
 
@@ -31,7 +32,9 @@ def export_transcript_async(
 ):
     transcript = generate_student_transcript(db, student_id)
     if transcript is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student not found"
+        )
 
     background_tasks.add_task(process_async_report, "transcript", student_id)
     return {

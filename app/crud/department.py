@@ -1,10 +1,9 @@
+from app.models import Department
+from app.schemas import DepartmentCreate, DepartmentUpdate
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
-
-from app.models import Department
-from app.schemas import DepartmentCreate, DepartmentUpdate
 
 
 def create_department(db: Session, department: DepartmentCreate) -> Department:
@@ -37,7 +36,9 @@ def update_department(
     result = db.execute(statement)
     department = result.scalar_one_or_none()
     if department is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Department not found"
+        )
 
     if department_update.name is not None:
         department.name = department_update.name
@@ -69,7 +70,9 @@ def read_department(db: Session, department_id: int) -> Department:
     result = db.execute(statement)
     department = result.scalar_one_or_none()
     if department is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Department not found"
+        )
     return department
 
 
@@ -84,7 +87,9 @@ def delete_department(db: Session, department_id: int) -> dict:
     result = db.execute(statement)
     department = result.scalar_one_or_none()
     if department is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Department not found"
+        )
 
     db.delete(department)
     try:
