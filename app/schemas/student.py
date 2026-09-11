@@ -19,10 +19,12 @@ class StudentUpdate(BaseModel):
     department_id: int | None = Field(default=None, gt=0)
     age: int | None = Field(default=None, gt=0, le=120)
     email: EmailStr | None = None
+    version_id: int | None = Field(default=None, ge=1)
 
 
 class StudentResponseSchema(StudentBase):
     id: int
     user_id: int | None = None
+    version_id: int = 1
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)

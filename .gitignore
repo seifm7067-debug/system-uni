@@ -23,3 +23,8 @@ dist/
 htmlcov/
 .pytest_cache/
 .ruff_cache/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3

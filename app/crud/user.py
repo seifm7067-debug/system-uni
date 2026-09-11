@@ -144,11 +144,23 @@ def delete_user(db: Session, user_id: int) -> dict:
     return {"message": "User deleted successfully"}
 
 
+_DUMMY_HASH = None
+
+
+def _dummy_verify(password: str) -> bool:
+    global _DUMMY_HASH
+    if _DUMMY_HASH is None:
+        _DUMMY_HASH = hash_password("dummy_password_for_timing")
+    verify_password(password, _DUMMY_HASH)
+    return False
+
+
 def login_user(db: Session, user_login: UserLogin) -> TokenResponse:
     statement = select(User).where(User.email == user_login.email)
     result = db.execute(statement)
     user = result.scalar_one_or_none()
     if user is None:
+        _dummy_verify(user_login.password)
         raise HTTPException(status_code=401, detail="user or password incorrect")
     if verify_password(user_login.password, user.password_hash):
         return TokenResponse(access_token=create_access_token(user.id))

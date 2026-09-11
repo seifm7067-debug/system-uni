@@ -16,6 +16,8 @@ _model_modules = (
     "courseschedule",
     "enrollment",
     "user",
+    "job",
+    "report",
 )
 for _m in _model_modules:
     import_module(f"app.models.{_m}")

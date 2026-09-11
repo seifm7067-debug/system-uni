@@ -14,7 +14,6 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
-    """Authenticate the request and return its user; this does not check roles."""
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="not authenticated"

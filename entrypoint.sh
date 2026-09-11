@@ -30,8 +30,11 @@ print("[ENTRYPOINT ERROR] Database connection timed out after max attempts.", fi
 sys.exit(1)
 EOF
 
-echo "[ENTRYPOINT] Running Alembic database migrations..."
-uv run alembic upgrade head
+if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+    echo "[ENTRYPOINT] Running Alembic database migrations..."
+    uv run alembic upgrade head
+    echo "[ENTRYPOINT] Migration successful."
+fi
 
-echo "[ENTRYPOINT] Migration successful. Starting application process..."
+echo "[ENTRYPOINT] Starting application process..."
 exec "$@"

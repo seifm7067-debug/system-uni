@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from app.database import Base
 from sqlalchemy import DateTime, ForeignKey, Integer, String, func
@@ -31,3 +31,10 @@ class Student(Base):
         ForeignKey("users.id"), unique=True, index=True
     )
     user: Mapped[User] = relationship("User", back_populates="student")
+    version_id: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+
+    __mapper_args__: ClassVar[dict[str, Any]] = {
+        "version_id_col": version_id,
+    }

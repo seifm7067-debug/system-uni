@@ -1,4 +1,4 @@
-from app.models import Enrollment, Student, User
+from app.models import CourseOffering, Enrollment, Student, User
 from app.models.user import UserRole
 from app.schemas import EnrollmentCreate, EnrollmentUpdate
 from fastapi import HTTPException, status
@@ -8,6 +8,45 @@ from sqlalchemy.orm import Session
 
 
 def create_enrollment(db: Session, enrollment: EnrollmentCreate) -> Enrollment:
+    statement_student = select(Student).where(Student.id == enrollment.student_id)
+    student = db.execute(statement_student).scalar_one_or_none()
+    if student is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Student not found",
+        )
+
+    statement_offering = select(CourseOffering).where(
+        CourseOffering.id == enrollment.course_offering_id
+    )
+    course_offering = db.execute(statement_offering).scalar_one_or_none()
+    if course_offering is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course offering not found",
+        )
+
+    statement_existing_enrollment = select(Enrollment).where(
+        Enrollment.student_id == enrollment.student_id,
+        Enrollment.course_offering_id == enrollment.course_offering_id,
+    )
+    existing_enrollment = db.execute(statement_existing_enrollment).scalar_one_or_none()
+    if existing_enrollment is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Student is already enrolled in this course offering",
+        )
+
+    statement_existing_code = select(Enrollment).where(
+        Enrollment.enrollment_code == enrollment.enrollment_code
+    )
+    existing_code = db.execute(statement_existing_code).scalar_one_or_none()
+    if existing_code is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Enrollment code duplicate",
+        )
+
     new_enrollment = Enrollment(**enrollment.model_dump())
     db.add(new_enrollment)
     try:

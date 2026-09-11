@@ -45,6 +45,21 @@ docker compose down
 uv run alembic upgrade head
 ```
 
+## نظام تقارير الخلفية (Worker)
+
+تقارير الـ transcript تُنفذ بواسطة worker مستقل يقرأ المهام مباشرة من PostgreSQL (المصدر الوحيد للحقيقة):
+
+```powershell
+uv run python -m app.workers.runner
+```
+
+- `POST /reports/export/{student_id}` يُسجّل Job بحالة `queued` ويعيد `202`.
+- الـ worker يلتقط المهام ذريًا (`FOR UPDATE SKIP LOCKED`)، يجدد lease أثناء التوليد، ويعيد المحاولة تلقائيًا مع backoff عند الفشل المؤقت.
+- استعلام الحالة عبر `GET /reports/jobs/{job_id}` يقرأ من PostgreSQL مباشرة.
+- إعدادات السلوك في `app/config.py`: `job_poll_interval_seconds`, `job_lease_seconds`, `job_heartbeat_seconds`, `job_max_attempts`, `job_retry_base_seconds`, `worker_retry_attempts`.
+
+عبر Docker تُشغَّل الخدمة تلقائيًا كحاوية `worker` في `docker-compose.yml`.
+
 إنشاء حساب المسؤول الأول (Bootstrap Admin):
 
 ```powershell
