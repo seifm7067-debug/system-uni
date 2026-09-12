@@ -73,7 +73,7 @@ def read_college(db: Session, college_id: int) -> College:
 
 
 def read_colleges(db: Session, skip: int = 0, limit: int = 100) -> list[College]:
-    statement = select(College).offset(skip).limit(limit)
+    statement = select(College).order_by(College.id).offset(skip).limit(limit)
     result = db.execute(statement)
     return result.scalars().all()
 

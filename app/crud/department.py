@@ -77,7 +77,7 @@ def read_department(db: Session, department_id: int) -> Department:
 
 
 def read_departments(db: Session, skip: int = 0, limit: int = 100) -> list[Department]:
-    statement = select(Department).offset(skip).limit(limit)
+    statement = select(Department).order_by(Department.id).offset(skip).limit(limit)
     result = db.execute(statement)
     return result.scalars().all()
 

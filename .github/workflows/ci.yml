@@ -49,13 +49,17 @@ jobs:
       - name: Check Ruff Formatting
         run: uv run ruff format --check .
 
+      - name: Run Bandit Security Scan
+        run: uv run bandit -q -r app
+
       - name: Run Alembic Upgrade on Postgres
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgrespassword@localhost:5432/system_uni_test
+          SECRET_KEY: testsecretkeyforcireplacewithlongvalue1234567890
         run: uv run alembic upgrade head
 
       - name: Run Pytest Suite
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgrespassword@localhost:5432/system_uni_test
-          SECRET_KEY: testsecretkeyforci
+          SECRET_KEY: testsecretkeyforcireplacewithlongvalue1234567890
         run: uv run pytest -v

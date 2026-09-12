@@ -2,7 +2,15 @@ from datetime import datetime, time
 from typing import TYPE_CHECKING
 
 from app.database import Base
-from sqlalchemy import DateTime, ForeignKey, String, Time, UniqueConstraint, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    String,
+    Time,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -34,4 +42,5 @@ class CourseSchedule(Base):
             "end_time",
             name="uq_course_schedule",
         ),
+        CheckConstraint("end_time > start_time", name="ck_course_schedule_time_order"),
     )

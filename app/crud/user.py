@@ -37,6 +37,7 @@ def register_user(db: Session, user: UserRegister) -> User:
     data = user.model_dump(exclude={"password"})
     data["password_hash"] = hash_password(user.password)
     data["role"] = UserRole.GUEST
+    data["email"] = data["email"].lower()
     new_user = User(**data)
     db.add(new_user)
     try:
@@ -54,6 +55,7 @@ def register_user(db: Session, user: UserRegister) -> User:
 def create_user(db: Session, user: UserCreate) -> User:
     data = user.model_dump(exclude={"password"})
     data["password_hash"] = hash_password(user.password)
+    data["email"] = data["email"].lower()
     new_user = User(**data)
     db.add(new_user)
     try:
@@ -73,14 +75,19 @@ def update_user(db: Session, user_update: UserUpdate, user_id: int) -> User:
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     ensure_admin_remains(db, user, user_update.role)
+    invalidates_tokens = False
     if user_update.username is not None:
         user.username = user_update.username
     if user_update.email is not None:
-        user.email = user_update.email
+        user.email = user_update.email.lower()
     if user_update.password is not None:
         user.password_hash = hash_password(user_update.password)
+        invalidates_tokens = True
     if user_update.role is not None:
         user.role = user_update.role
+        invalidates_tokens = True
+    if invalidates_tokens:
+        user.token_version += 1
     try:
         db.commit()
         db.refresh(user)
@@ -99,9 +106,11 @@ def update_user_me(
     if user_update.username is not None:
         current_user.username = user_update.username
     if user_update.email is not None:
-        current_user.email = user_update.email
+        current_user.email = user_update.email.lower()
     if user_update.password is not None:
         current_user.password_hash = hash_password(user_update.password)
+        # Invalidate tokens issued before this password change.
+        current_user.token_version += 1
     try:
         db.commit()
         db.refresh(current_user)
@@ -122,7 +131,7 @@ def read_user(db: Session, user_id: int) -> User:
 
 
 def read_users(db: Session, skip: int = 0, limit: int = 100) -> list[User]:
-    statement = select(User).offset(skip).limit(limit)
+    statement = select(User).order_by(User.id).offset(skip).limit(limit)
     result = db.execute(statement)
     return result.scalars().all()
 
@@ -156,12 +165,14 @@ def _dummy_verify(password: str) -> bool:
 
 
 def login_user(db: Session, user_login: UserLogin) -> TokenResponse:
-    statement = select(User).where(User.email == user_login.email)
+    statement = select(User).where(User.email == user_login.email.lower())
     result = db.execute(statement)
     user = result.scalar_one_or_none()
     if user is None:
         _dummy_verify(user_login.password)
         raise HTTPException(status_code=401, detail="user or password incorrect")
     if verify_password(user_login.password, user.password_hash):
-        return TokenResponse(access_token=create_access_token(user.id))
+        return TokenResponse(
+            access_token=create_access_token(user.id, user.token_version)
+        )
     raise HTTPException(status_code=401, detail="user or password incorrect")

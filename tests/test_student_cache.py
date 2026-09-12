@@ -137,3 +137,75 @@ def test_student_mutations_work_when_redis_unavailable(db_session):
 
         result = delete_student(db, student.id)
         assert result == {"message": "Student deleted successfully"}
+
+
+def test_cache_is_invalidated_only_after_commit(db_session):
+    """A rollback (409) must not clear a still-valid cache entry."""
+    db, department = db_session
+
+    student = create_student(
+        db,
+        StudentCreate(
+            name="Carol",
+            email="carol@example.com",
+            age=20,
+            department_id=department.id,
+        ),
+    )
+    other = create_student(
+        db,
+        StudentCreate(
+            name="Erin",
+            email="erin@example.com",
+            age=21,
+            department_id=department.id,
+        ),
+    )
+
+    mock_redis = MagicMock()
+    with patch("app.crud.student.get_redis_client", return_value=mock_redis):
+        from fastapi import HTTPException
+
+        update = StudentUpdate(email=other.email)  # duplicate email -> 409
+        with pytest.raises(HTTPException) as exc_info:
+            update_student(db, update, student.id)
+        assert exc_info.value.status_code == 409
+
+        # The failed update must not have touched the cache.
+        mock_redis.delete.assert_not_called()
+
+
+def test_read_student_survives_redis_dying_mid_request(db_session):
+    """Redis failing after startup must degrade to a direct DB read, not a 500."""
+    from app.crud.student import read_student
+    from app.schemas.student import StudentResponseSchema
+
+    db, department = db_session
+    student = create_student(
+        db,
+        StudentCreate(
+            name="Dave",
+            email="dave@example.com",
+            age=20,
+            department_id=department.id,
+        ),
+    )
+    admin = User(
+        username="dave_admin",
+        email="dave_admin@example.com",
+        password_hash=hash_password("secret123"),
+        role=UserRole.ADMIN,
+    )
+    db.add(admin)
+    db.commit()
+    db.refresh(admin)
+
+    broken_redis = MagicMock()
+    broken_redis.get.side_effect = ConnectionError("redis went away")
+    broken_redis.set.side_effect = ConnectionError("redis went away")
+
+    with patch("app.crud.student.get_redis_client", return_value=broken_redis):
+        response = read_student(db, student.id, admin)
+
+    assert isinstance(response, StudentResponseSchema)
+    assert response.name == "Dave"

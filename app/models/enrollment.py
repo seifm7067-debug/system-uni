@@ -2,7 +2,14 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from app.database import Base
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -21,8 +28,12 @@ class Enrollment(Base):
         String(50), nullable=False, unique=True, index=True
     )
     grade: Mapped[int] = mapped_column(nullable=True)
-    is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
-    is_withdrawn: Mapped[bool] = mapped_column(nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(
+        nullable=False, default=True, server_default="true"
+    )
+    is_withdrawn: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default="false"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -33,5 +44,13 @@ class Enrollment(Base):
     __table_args__ = (
         UniqueConstraint(
             "student_id", "course_offering_id", name="uq_student_course_offering"
+        ),
+        CheckConstraint(
+            "grade IS NULL OR (grade >= 0 AND grade <= 100)",
+            name="ck_enrollment_grade_range",
+        ),
+        CheckConstraint(
+            "NOT (is_active AND is_withdrawn)",
+            name="ck_enrollment_active_xor_withdrawn",
         ),
     )

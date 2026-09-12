@@ -73,7 +73,7 @@ def read_teacher(db: Session, teacher_id: int) -> Teacher:
 
 
 def read_teachers(db: Session, skip: int = 0, limit: int = 100) -> list[Teacher]:
-    statement = select(Teacher).offset(skip).limit(limit)
+    statement = select(Teacher).order_by(Teacher.id).offset(skip).limit(limit)
     result = db.execute(statement)
     return result.scalars().all()
 

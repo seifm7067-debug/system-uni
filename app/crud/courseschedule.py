@@ -6,9 +6,18 @@ from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
 
+def _ensure_time_order(start_time, end_time) -> None:
+    if end_time <= start_time:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="end_time must be strictly after start_time",
+        )
+
+
 def create_course_schedule(
     db: Session, course_schedule: CourseScheduleCreate
 ) -> CourseSchedule:
+    _ensure_time_order(course_schedule.start_time, course_schedule.end_time)
     new_course_schedule = CourseSchedule(**course_schedule.model_dump())
     db.add(new_course_schedule)
     try:
@@ -44,11 +53,7 @@ def update_course_schedule(
 
     start_time = schedule_update.start_time or course_schedule.start_time
     end_time = schedule_update.end_time or course_schedule.end_time
-    if end_time <= start_time:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="end_time must be strictly after start_time",
-        )
+    _ensure_time_order(start_time, end_time)
 
     if schedule_update.day is not None:
         course_schedule.day = schedule_update.day
@@ -95,7 +100,9 @@ def read_course_schedule(db: Session, course_schedule_id: int) -> CourseSchedule
 def read_course_schedules(
     db: Session, skip: int = 0, limit: int = 100
 ) -> list[CourseSchedule]:
-    statement = select(CourseSchedule).offset(skip).limit(limit)
+    statement = (
+        select(CourseSchedule).order_by(CourseSchedule.id).offset(skip).limit(limit)
+    )
     result = db.execute(statement)
     return result.scalars().all()
 

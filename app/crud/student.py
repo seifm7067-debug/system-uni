@@ -1,4 +1,5 @@
 import json
+import logging
 
 from app.models import Student, User
 from app.models.user import UserRole
@@ -10,11 +11,19 @@ from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import StaleDataError
 
+logger = logging.getLogger(__name__)
+
 
 def _invalidate_student_cache(student_id: int) -> None:
-    redis_client = get_redis_client()
-    if redis_client is not None:
-        redis_client.delete(f"student:{student_id}")
+    """Best-effort cache invalidation; Redis outages must never fail a request."""
+    try:
+        redis_client = get_redis_client()
+        if redis_client is not None:
+            redis_client.delete(f"student:{student_id}")
+    except Exception:
+        logger.warning(
+            "Could not invalidate student:%s cache", student_id, exc_info=True
+        )
 
 
 def create_student(db: Session, student: StudentCreate) -> Student:
@@ -67,11 +76,9 @@ def update_student(
     if student_update.email is not None:
         student.email = student_update.email
 
-    _invalidate_student_cache(student_id)
     try:
         db.commit()
         db.refresh(student)
-        return student
     except StaleDataError:
         db.rollback()
         raise HTTPException(
@@ -90,6 +97,32 @@ def update_student(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Invalid student data provided",
         )
+    # Invalidate only after the commit succeeded so a concurrent
+    # reader cannot repopulate the cache with the old row.
+    _invalidate_student_cache(student_id)
+    return student
+
+
+def _read_cached_student(redis, cache_key: str) -> StudentResponseSchema | None:
+    """Return a valid cached response, or None when Redis is down/corrupted."""
+    try:
+        cached_student = redis.get(cache_key)
+        if cached_student:
+            student_dict = json.loads(cached_student)
+            return StudentResponseSchema.model_validate(student_dict)
+    except Exception:
+        logger.warning("Could not read student cache %s", cache_key, exc_info=True)
+    return None
+
+
+def _write_cached_student(
+    redis, cache_key: str, response: StudentResponseSchema
+) -> None:
+    try:
+        student_json = json.dumps(response.model_dump(mode="json"))
+        redis.set(cache_key, student_json, ex=60)
+    except Exception:
+        logger.warning("Could not write student cache %s", cache_key, exc_info=True)
 
 
 def read_student(db: Session, student_id: int, user: User) -> StudentResponseSchema:
@@ -98,11 +131,9 @@ def read_student(db: Session, student_id: int, user: User) -> StudentResponseSch
     if user.role == UserRole.GUEST:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     if user.role == UserRole.ADMIN and redis:
-        cached_student = redis.get(cache_key)
-        if cached_student:
-            student_dict = json.loads(cached_student)
-            student_response = StudentResponseSchema.model_validate(student_dict)
-            return student_response
+        cached = _read_cached_student(redis, cache_key)
+        if cached is not None:
+            return cached
 
     statement = select(Student).where(Student.id == student_id)
     if user.role == UserRole.USER:
@@ -117,9 +148,7 @@ def read_student(db: Session, student_id: int, user: User) -> StudentResponseSch
 
     student_response = StudentResponseSchema.model_validate(student)
     if user.role == UserRole.ADMIN and redis:
-        cache_student = student_response.model_dump(mode="json")
-        student_json = json.dumps(cache_student)
-        redis.set(cache_key, student_json, ex=60)
+        _write_cached_student(redis, cache_key, student_response)
 
     return student_response
 
@@ -137,7 +166,7 @@ def read_students(
     if user.role == UserRole.USER:
         statement = statement.where(Student.user_id == user.id)
 
-    statement = statement.offset(skip).limit(limit)
+    statement = statement.order_by(Student.id).offset(skip).limit(limit)
     result = db.execute(statement)
     return result.scalars().all()
 
@@ -152,7 +181,6 @@ def delete_student(db: Session, student_id: int) -> dict:
         )
 
     db.delete(student)
-    _invalidate_student_cache(student_id)
     try:
         db.commit()
     except IntegrityError:
@@ -161,6 +189,7 @@ def delete_student(db: Session, student_id: int) -> dict:
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot delete student due to existing dependent records (e.g. enrollments)",
         )
+    _invalidate_student_cache(student_id)
     return {"message": "Student deleted successfully"}
 
 
@@ -202,13 +231,11 @@ def link_student_to_user(db: Session, student_id: int, user_id: int) -> Student:
         )
 
     student.user_id = user_id
-    _invalidate_student_cache(student.id)
 
     try:
         db.commit()
         db.refresh(student)
         db.refresh(user)
-        return student
     except StaleDataError:
         db.rollback()
         raise HTTPException(
@@ -221,3 +248,5 @@ def link_student_to_user(db: Session, student_id: int, user_id: int) -> Student:
             status_code=status.HTTP_409_CONFLICT,
             detail="Linking constraint failed: student or user already linked",
         )
+    _invalidate_student_cache(student.id)
+    return student

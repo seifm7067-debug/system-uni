@@ -26,10 +26,11 @@ def get_transcript_endpoint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Student not found"
         )
+    # Non-admins get a uniform 404 whether or not the student exists,
+    # so IDs of other students cannot be enumerated.
     if current_user.role != UserRole.ADMIN and student.user_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not authorized to view this transcript",
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student not found"
         )
     transcript = generate_student_transcript(db, student_id)
     if transcript is None:
@@ -53,8 +54,7 @@ def export_transcript_async(
 
     if current_user.role != UserRole.ADMIN and student.user_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not authorized to export this transcript",
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student not found"
         )
 
     job_id = str(uuid.uuid4())
@@ -90,8 +90,7 @@ def get_job_status(
 
     if current_user.role != UserRole.ADMIN and current_user.id != db_job.owner_id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not authorized to view this job",
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
         )
 
     report = db.query(Report).filter(Report.job_id == job_id).first()

@@ -27,6 +27,10 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Bumped on credential/role changes so issued tokens become invalid.
+    token_version: Mapped[int] = mapped_column(
+        nullable=False, default=0, server_default="0"
+    )
     student: Mapped[Student] = relationship(
         "Student", back_populates="user", uselist=False
     )

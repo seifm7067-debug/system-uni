@@ -32,7 +32,7 @@ EOF
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     echo "[ENTRYPOINT] Running Alembic database migrations..."
-    uv run alembic upgrade head
+    alembic upgrade head
     echo "[ENTRYPOINT] Migration successful."
 fi
 

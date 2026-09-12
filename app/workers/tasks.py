@@ -1,4 +1,5 @@
 import logging
+import random
 import threading
 import uuid
 from collections.abc import Iterator
@@ -24,6 +25,10 @@ class PermanentJobError(Exception):
     """An error that cannot succeed by retrying the same report job."""
 
 
+class LeaseLostError(Exception):
+    """This execution lost the lease; the current job owner finishes the job."""
+
+
 @dataclass(frozen=True)
 class ClaimedJob:
     job_id: str
@@ -46,7 +51,7 @@ def process_background_notification(
 def _complete_values(now: datetime) -> dict[str, Any]:
     return {
         "status": "completed",
-        "worker_token": None,  # nosec B105 - lease column name, not a secret
+        "worker_token": None,  # lease column name, not a secret
         "lease_until": None,
         "retry_at": None,
         "last_error": None,
@@ -160,18 +165,24 @@ def _renew_lease(db: Session, claim: ClaimedJob) -> bool:
 
 
 @contextmanager
-def job_heartbeat(claim: ClaimedJob) -> Iterator[None]:
-    """Renew the lease while report generation is running in the foreground."""
+def job_heartbeat(claim: ClaimedJob) -> Iterator[threading.Event]:
+    """Renew the lease while generating; flag a report persisted by another worker."""
     stop_event = threading.Event()
+    report_found = threading.Event()
 
     def heartbeat_loop() -> None:
         while not stop_event.wait(settings.job_heartbeat_seconds):
             db = SessionLocal()
             try:
-                # A report may have been written by an older worker that resumed late.
+                # Another worker may have finished first and persisted the report.
                 if reconcile_reported_job(db, claim.job_id) is not None:
+                    report_found.set()
                     return
                 if not _renew_lease(db, claim):
+                    logger.info(
+                        "[WORKER] Lease lost for job %s; its current owner will finish it",
+                        claim.job_id,
+                    )
                     return
             except SQLAlchemyError:
                 db.rollback()
@@ -184,7 +195,7 @@ def job_heartbeat(claim: ClaimedJob) -> Iterator[None]:
     thread = threading.Thread(target=heartbeat_loop, daemon=True)
     thread.start()
     try:
-        yield
+        yield report_found
     finally:
         stop_event.set()
         thread.join(timeout=1.0)
@@ -193,13 +204,22 @@ def job_heartbeat(claim: ClaimedJob) -> Iterator[None]:
 def _persist_or_adopt_report(
     db: Session, job_id: str, result: dict[str, Any]
 ) -> Report:
-    """Persist the first result and atomically mark its job as completed."""
+    """Persist the winning result; the report row arbitrates job completion.
+
+    Whichever execution finishes first owns the report row: it persists the
+    report and finalizes the job from it, even if its lease expired meanwhile.
+    Late workers collide on the UNIQUE(report.job_id) constraint, adopt the
+    winner's report, and let job state flow from the persisted report.
+    """
     try:
         report = Report(job_id=job_id, result=result)
         db.add(report)
         db.flush()
         db.execute(
-            update(Job).where(Job.job_id == job_id).values(**_complete_values(_now()))
+            update(Job)
+            .where(Job.job_id == job_id)
+            .where(Job.status != "completed")
+            .values(**_complete_values(_now()))
         )
         db.commit()
         return report
@@ -232,7 +252,7 @@ def _record_failure(
     failed = permanent or job.attempt_count >= settings.job_max_attempts
     values: dict[str, Any] = {
         "status": "failed" if failed else "queued",
-        "worker_token": None,  # nosec B105 - lease column name, not a secret
+        "worker_token": None,  # lease column name, not a secret
         "lease_until": None,
         "retry_at": None,
         "last_error": message,
@@ -240,6 +260,8 @@ def _record_failure(
     }
     if not failed:
         delay = settings.job_retry_base_seconds * (2 ** (job.attempt_count - 1))
+        # Jitter prevents a synchronized retry herd after a shared failure.
+        delay += random.uniform(0, delay / 2)
         values["retry_at"] = now + timedelta(seconds=delay)
 
     update_result = db.execute(
@@ -280,7 +302,7 @@ def process_claimed_report(claim: ClaimedJob) -> dict[str, Any]:
 
         report_type = job.report_type
         target_id = job.target_id
-        with job_heartbeat(claim):
+        with job_heartbeat(claim) as report_found:
             existing = reconcile_reported_job(db, claim.job_id)
             if existing is not None:
                 return {
@@ -293,6 +315,21 @@ def process_claimed_report(claim: ClaimedJob) -> dict[str, Any]:
                 raise PermanentJobError(f"Unsupported report type: {report_type}")
 
             transcript = generate_student_transcript(db, target_id)
+
+            # A faster worker may have persisted the report while we generated.
+            if report_found.is_set():
+                existing = reconcile_reported_job(db, claim.job_id)
+                if existing is not None:
+                    logger.info(
+                        "[WORKER] Job %s was completed by another worker; adopting its report",
+                        claim.job_id,
+                    )
+                    return {
+                        "status": "completed",
+                        "job_id": claim.job_id,
+                        "result": existing.result,
+                    }
+                raise LeaseLostError(claim.job_id)
 
         existing = reconcile_reported_job(db, claim.job_id)
         if existing is not None:
@@ -313,6 +350,25 @@ def process_claimed_report(claim: ClaimedJob) -> dict[str, Any]:
             "[WORKER] Job %s ended with status %s: %s", claim.job_id, status, exc
         )
         return {"status": status, "job_id": claim.job_id}
+    except LeaseLostError:
+        db.rollback()
+        # Another worker persisted the report or owns the job now; adopt or step aside.
+        existing = reconcile_reported_job(db, claim.job_id)
+        if existing is not None:
+            logger.info(
+                "[WORKER] Job %s completed by the current owner; adopted its report",
+                claim.job_id,
+            )
+            return {
+                "status": "completed",
+                "job_id": claim.job_id,
+                "result": existing.result,
+            }
+        logger.info(
+            "[WORKER] Job %s is owned by another worker now; leaving it untouched",
+            claim.job_id,
+        )
+        return {"status": "already_processing", "job_id": claim.job_id}
     except Exception as exc:
         db.rollback()
         existing = reconcile_reported_job(db, claim.job_id)

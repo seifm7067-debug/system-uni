@@ -73,7 +73,7 @@ def read_course(db: Session, course_id: int) -> Course:
 
 
 def read_courses(db: Session, skip: int = 0, limit: int = 100) -> list[Course]:
-    statement = select(Course).offset(skip).limit(limit)
+    statement = select(Course).order_by(Course.id).offset(skip).limit(limit)
     result = db.execute(statement)
     return result.scalars().all()
 

@@ -19,13 +19,15 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="not authenticated"
         )
 
-    user_id = decode_access_token(credentials.credentials)
-    if user_id is None:
+    decoded = decode_access_token(credentials.credentials)
+    if decoded is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token"
         )
+    user_id, token_version = decoded
     user = db.get(User, user_id)
-    if user is None:
+    if user is None or user.token_version != token_version:
+        # Deleted user or credentials/role changed after this token was issued.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token"
         )

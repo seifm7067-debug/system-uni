@@ -406,8 +406,9 @@ def test_job_status_forbidden_for_non_owner_user(setup_db):
     db.commit()
 
     resp = client.get(f"/reports/jobs/{job_id}", headers=headers)
-    assert resp.status_code == 403
-    assert resp.json() == {"detail": "You are not authorized to view this job"}
+    # Uniform 404 so job IDs of other users cannot be enumerated.
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "Job not found"}
 
 
 def test_export_transcript_student_not_found():
@@ -648,8 +649,9 @@ def test_get_transcript_regular_user_forbidden_for_other_student(setup_db):
     headers = {"Authorization": f"Bearer {token}"}
 
     resp = client.get(f"/reports/transcript/{student.id}", headers=headers)
-    assert resp.status_code == 403
-    assert resp.json() == {"detail": "You are not authorized to view this transcript"}
+    # Uniform 404 so other students' IDs cannot be enumerated.
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "Student not found"}
 
 
 def test_get_transcript_admin_can_view_any_student(setup_db):
@@ -740,8 +742,9 @@ def test_export_transcript_regular_user_forbidden_for_other_student(setup_db):
     headers = {"Authorization": f"Bearer {token}"}
 
     resp = client.post(f"/reports/export/{student.id}", headers=headers)
-    assert resp.status_code == 403
-    assert resp.json() == {"detail": "You are not authorized to export this transcript"}
+    # Uniform 404 so other students' IDs cannot be enumerated.
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "Student not found"}
 
 
 def test_export_transcript_admin_can_export_any_student(setup_db):
@@ -949,13 +952,13 @@ def test_job_status_uses_database_owner_for_authorization(setup_db):
     assert resp.status_code == 200
     assert resp.json()["owner_id"] == 1
 
-    # Regular user access -> 403
+    # Regular user access -> uniform 404 (no job-id enumeration)
     user_token = create_access_token(user_id=regular_user.id)
     resp = client.get(
         f"/reports/jobs/{job_id}", headers={"Authorization": f"Bearer {user_token}"}
     )
-    assert resp.status_code == 403
-    assert resp.json()["detail"] == "You are not authorized to view this job"
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Job not found"
 
 
 # ============================================================================
@@ -2504,7 +2507,62 @@ def test_course_schedule_time_validation_and_creation(setup_db):
     )
     assert resp_invalid.status_code == 422
 
+    # 1b. The DB CHECK constraint is the final arbiter even for raw inserts.
+    from sqlalchemy import text as sa_text
+    from sqlalchemy.exc import IntegrityError as SAIntegrityError
+
+    with pytest.raises(SAIntegrityError):
+        db.execute(
+            sa_text(
+                "INSERT INTO course_schedule (day, schedule_type, start_time, "
+                "end_time, room, course_offering_id) "
+                "VALUES ('Tuesday', 'Lab', '14:00', '13:00', 'R9', :offering_id)"
+            ),
+            {"offering_id": data["offering"].id},
+        )
+    db.rollback()
+
+
+def test_enrollment_db_constraints_are_the_final_arbiter(setup_db):
+    """Raw inserts bypassing Pydantic are still stopped by CHECK constraints."""
+    from sqlalchemy import text as sa_text
+    from sqlalchemy.exc import IntegrityError as SAIntegrityError
+
+    db = setup_db
+    data = create_enrollment_authorization_data(db)
+    student_id = data["own_student"].id
+    offering_id = data["offering"].id
+
+    # grade out of range -> rejected by the DB, not just Pydantic.
+    with pytest.raises(SAIntegrityError):
+        db.execute(
+            sa_text(
+                "INSERT INTO enrollment (student_id, course_offering_id, "
+                "enrollment_code, grade) VALUES (:s, :o, 'ENR-DB-1', 150)"
+            ),
+            {"s": student_id, "o": offering_id},
+        )
+    db.rollback()
+
+    # active and withdrawn at once -> contradictory state rejected.
+    with pytest.raises(SAIntegrityError):
+        db.execute(
+            sa_text(
+                "INSERT INTO enrollment (student_id, course_offering_id, "
+                "enrollment_code, is_active, is_withdrawn) "
+                "VALUES (:s, :o, 'ENR-DB-2', true, true)"
+            ),
+            {"s": student_id, "o": offering_id},
+        )
+    db.rollback()
+
+
+def test_course_schedule_valid_creation_and_duplicate_conflict(setup_db):
     # 2. Valid creation -> 201
+    db = setup_db
+    data = create_schedule_test_setup(db)
+    admin_token = create_access_token(user_id=1)
+    headers = {"Authorization": f"Bearer {admin_token}"}
     valid_payload = {
         "day": "Monday",
         "schedule_type": "Lecture",
@@ -2662,6 +2720,102 @@ def test_user_self_update_me(setup_db):
 
     db.expire_all()
     assert db.get(User, user.id).username == "me_user_updated"
+
+
+def test_password_change_invalidates_previously_issued_tokens(setup_db):
+    """A token issued before a password change must stop working immediately."""
+    db = setup_db
+    user = User(
+        username="stale_token_user",
+        email="stale_token@example.com",
+        password_hash=hash_password("password123"),
+        role=UserRole.USER,
+    )
+    db.add(user)
+    db.commit()
+    old_token = create_access_token(user_id=user.id)
+    headers = {"Authorization": f"Bearer {old_token}"}
+
+    assert client.get("/users/me", headers=headers).status_code == 200
+
+    resp = client.put(
+        "/users/me", json={"password": "NewPassword456!"}, headers=headers
+    )
+    assert resp.status_code == 200
+
+    # The pre-change token must now be rejected.
+    resp_old = client.get("/users/me", headers=headers)
+    assert resp_old.status_code == 401
+
+    # Logging in with the new password returns a fresh, working token.
+    resp_login = client.post(
+        "/users/login",
+        json={"email": "stale_token@example.com", "password": "NewPassword456!"},
+    )
+    assert resp_login.status_code == 200
+    new_headers = {"Authorization": f"Bearer {resp_login.json()['access_token']}"}
+    assert client.get("/users/me", headers=new_headers).status_code == 200
+
+
+def test_email_normalization_on_register_and_login(setup_db):
+    """Emails are stored lowercase; login is case-insensitive on the local part."""
+    resp = client.post(
+        "/users/register",
+        json={
+            "username": "case_user",
+            "email": "Case.User@Example.COM",
+            "password": "ValidPassword123!",
+        },
+    )
+    assert resp.status_code == 201
+    assert resp.json()["email"] == "case.user@example.com"
+
+    # Login with different casing still finds the account.
+    resp_login = client.post(
+        "/users/login",
+        json={"email": "CASE.USER@example.com", "password": "ValidPassword123!"},
+    )
+    assert resp_login.status_code == 200
+
+    # Registering the same email in another casing is a duplicate.
+    resp_dup = client.post(
+        "/users/register",
+        json={
+            "username": "case_user2",
+            "email": "case.user@example.com",
+            "password": "ValidPassword123!",
+        },
+    )
+    assert resp_dup.status_code == 409
+
+
+def test_role_change_invalidates_previously_issued_tokens(setup_db):
+    """Tokens issued under an old role must not keep the old privileges."""
+    db = setup_db
+    user = User(
+        username="demoted_user",
+        email="demoted@example.com",
+        password_hash=hash_password("password123"),
+        role=UserRole.USER,
+    )
+    db.add(user)
+    db.commit()
+    user_token = create_access_token(user_id=user.id)
+    user_headers = {"Authorization": f"Bearer {user_token}"}
+    admin_token = create_access_token(user_id=1)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    # Works before the role change.
+    assert client.get("/users/me", headers=user_headers).status_code == 200
+
+    resp = client.put(
+        f"/users/{user.id}", json={"role": "guest"}, headers=admin_headers
+    )
+    assert resp.status_code == 200
+
+    # Old token is rejected instead of silently downgrading.
+    resp_old = client.get("/users/me", headers=user_headers)
+    assert resp_old.status_code == 401
 
 
 def test_user_me_student_endpoints_for_guest_and_user(setup_db):

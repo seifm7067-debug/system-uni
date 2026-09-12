@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from app.database import Base
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import DateTime, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -52,6 +52,10 @@ class Job(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+    # Composite index backing the worker's claim query:
+    # status + retry_at (queued/ready) and status + lease_until (abandoned).
+    __table_args__ = (Index("ix_job_claim", "status", "retry_at", "lease_until"),)
 
     report: Mapped[Report | None] = relationship(
         "Report", back_populates="job", uselist=False, cascade="all, delete-orphan"

@@ -167,6 +167,69 @@ def test_first_persisted_report_wins_after_a_takeover(job_db, monkeypatch):
     db.close()
 
 
+def test_worker_adopts_report_found_by_heartbeat_mid_generation(job_db, monkeypatch):
+    """The heartbeat sees another worker's report and this execution stops early."""
+    db = job_db()
+    create_job(db)
+    claim_b = tasks.claim_next_job(db)
+    assert claim_b is not None
+    monkeypatch.setattr(tasks.settings, "job_heartbeat_seconds", 0.05)
+
+    transcript_a = {"student_id": 10, "winner": "a"}
+
+    def b_generates_while_a_persists(*_):
+        # Worker A finished first and persisted its report while B was generating.
+        winner_db = job_db()
+        try:
+            winner_db.add(Report(job_id="job-1", result=transcript_a))
+            winner_db.execute(
+                update(Job)
+                .where(Job.job_id == "job-1")
+                .values(status="completed", worker_token=None, lease_until=None)
+            )
+            winner_db.commit()
+        finally:
+            winner_db.close()
+        # Give the real heartbeat thread time to notice the report.
+        import time
+
+        time.sleep(0.5)
+        return {"student_id": 10, "loser": "b"}
+
+    monkeypatch.setattr(
+        tasks, "generate_student_transcript", b_generates_while_a_persists
+    )
+    result = tasks.process_claimed_report(claim_b)
+
+    assert result == {"status": "completed", "job_id": "job-1", "result": transcript_a}
+    db.expire_all()
+    job = db.get(Job, "job-1")
+    assert job.status == "completed"
+    # The loser must not have overwritten the winner's report.
+    assert job.report.result == transcript_a
+    db.close()
+
+
+def test_loser_colliding_on_unique_adopts_winners_report(job_db):
+    """A late finisher hits UNIQUE(report.job_id) and adopts the winner's report."""
+    db = job_db()
+    create_job(db, status="processing", worker_token="late", job_version=1)
+
+    transcript_a = {"student_id": 10, "winner": "a"}
+    db.add(Report(job_id="job-1", result=transcript_a))
+    db.commit()
+
+    adopted = tasks._persist_or_adopt_report(
+        db, "job-1", {"student_id": 10, "loser": "b"}
+    )
+
+    assert adopted.result == transcript_a
+    db.expire_all()
+    job = db.get(Job, "job-1")
+    assert job.status == "completed"
+    db.close()
+
+
 def test_runner_repairs_job_with_existing_report(job_db, monkeypatch):
     db = job_db()
     create_job(db, status="processing", worker_token="interrupted", job_version=1)

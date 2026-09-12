@@ -424,3 +424,55 @@ def test_multi_table_composite_sequence_atomicity_and_rollback():
         assert len(departments_after) == 0, "Department must be rolled back"
     finally:
         db_verify.close()
+
+
+def test_postgres_check_constraints_reject_invalid_rows(atomicity_db_setup):
+    """CHECK constraints are enforced by PostgreSQL itself, even for raw SQL."""
+    from sqlalchemy import text as sa_text
+    from sqlalchemy.exc import IntegrityError as SAIntegrityError
+
+    student_id = atomicity_db_setup["student_id"]
+    offering_id = atomicity_db_setup["offering_id"]
+
+    db = SessionLocal()
+    try:
+        # grade out of range
+        with pytest.raises(SAIntegrityError) as exc_info:
+            db.execute(
+                sa_text(
+                    "INSERT INTO enrollment (student_id, course_offering_id, "
+                    "enrollment_code, grade) "
+                    "VALUES (:s, :o, 'ENR-CHECK-1', 150)"
+                ),
+                {"s": student_id, "o": offering_id},
+            )
+        assert "ck_enrollment_grade_range" in str(exc_info.value.orig)
+        db.rollback()
+
+        # contradictory active/withdrawn state
+        with pytest.raises(SAIntegrityError) as exc_info:
+            db.execute(
+                sa_text(
+                    "INSERT INTO enrollment (student_id, course_offering_id, "
+                    "enrollment_code, is_active, is_withdrawn) "
+                    "VALUES (:s, :o, 'ENR-CHECK-2', true, true)"
+                ),
+                {"s": student_id, "o": offering_id},
+            )
+        assert "ck_enrollment_active_xor_withdrawn" in str(exc_info.value.orig)
+        db.rollback()
+
+        # inverted schedule times
+        with pytest.raises(SAIntegrityError) as exc_info:
+            db.execute(
+                sa_text(
+                    "INSERT INTO course_schedule (day, schedule_type, start_time, "
+                    "end_time, room, course_offering_id) "
+                    "VALUES ('Monday', 'Lab', '15:00', '14:00', 'R1', :o)"
+                ),
+                {"o": offering_id},
+            )
+        assert "ck_course_schedule_time_order" in str(exc_info.value.orig)
+        db.rollback()
+    finally:
+        db.close()

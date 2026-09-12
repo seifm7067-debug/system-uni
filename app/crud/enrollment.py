@@ -142,7 +142,7 @@ def read_enrollments(
     if user.role == UserRole.USER:
         statement = statement.join(Student).where(Student.user_id == user.id)
 
-    statement = statement.offset(skip).limit(limit)
+    statement = statement.order_by(Enrollment.id).offset(skip).limit(limit)
     result = db.execute(statement)
     return result.scalars().all()
 
