@@ -22,7 +22,7 @@ def create_department(db: Session, department: DepartmentCreate) -> Department:
     except DataError:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid department data provided",
         )
 
@@ -60,7 +60,7 @@ def update_department(
     except DataError:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid department data provided",
         )
 

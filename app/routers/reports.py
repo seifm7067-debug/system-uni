@@ -1,4 +1,3 @@
-import logging
 import uuid
 
 from app.database import get_db
@@ -9,10 +8,10 @@ from app.models.user import User, UserRole
 from app.security.auth import require_admin_or_user
 from app.services.reports import generate_student_transcript
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/reports/transcript/{student_id}")
@@ -93,7 +92,9 @@ def get_job_status(
             status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
         )
 
-    report = db.query(Report).filter(Report.job_id == job_id).first()
+    report = db.execute(
+        select(Report).where(Report.job_id == job_id)
+    ).scalar_one_or_none()
     report_result = report.result if report is not None else None
     actual_status = "completed" if report is not None else db_job.status
     job_data = {

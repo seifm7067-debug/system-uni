@@ -13,7 +13,10 @@ from app.database import SessionLocal
 from app.models.job import Job
 from app.models.report import Report
 from app.services.notifications import send_notification_email
-from app.services.reports import generate_student_transcript
+from app.services.reports import (
+    TranscriptOwnershipLost,
+    generate_student_transcript,
+)
 from sqlalchemy import and_, case, exists, or_, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -51,7 +54,7 @@ def process_background_notification(
 def _complete_values(now: datetime) -> dict[str, Any]:
     return {
         "status": "completed",
-        "worker_token": None,  # lease column name, not a secret
+        "worker_token": None,  # nosec B105
         "lease_until": None,
         "retry_at": None,
         "last_error": None,
@@ -252,7 +255,7 @@ def _record_failure(
     failed = permanent or job.attempt_count >= settings.job_max_attempts
     values: dict[str, Any] = {
         "status": "failed" if failed else "queued",
-        "worker_token": None,  # lease column name, not a secret
+        "worker_token": None,  # nosec B105
         "lease_until": None,
         "retry_at": None,
         "last_error": message,
@@ -261,7 +264,7 @@ def _record_failure(
     if not failed:
         delay = settings.job_retry_base_seconds * (2 ** (job.attempt_count - 1))
         # Jitter prevents a synchronized retry herd after a shared failure.
-        delay += random.uniform(0, delay / 2)
+        delay += random.uniform(0, delay / 2)  # nosec B311
         values["retry_at"] = now + timedelta(seconds=delay)
 
     update_result = db.execute(
@@ -314,7 +317,7 @@ def process_claimed_report(claim: ClaimedJob) -> dict[str, Any]:
             if report_type != "transcript":
                 raise PermanentJobError(f"Unsupported report type: {report_type}")
 
-            transcript = generate_student_transcript(db, target_id)
+            transcript = generate_student_transcript(db, target_id, claim)
 
             # A faster worker may have persisted the report while we generated.
             if report_found.is_set():
@@ -350,7 +353,7 @@ def process_claimed_report(claim: ClaimedJob) -> dict[str, Any]:
             "[WORKER] Job %s ended with status %s: %s", claim.job_id, status, exc
         )
         return {"status": status, "job_id": claim.job_id}
-    except LeaseLostError:
+    except LeaseLostError, TranscriptOwnershipLost:
         db.rollback()
         # Another worker persisted the report or owns the job now; adopt or step aside.
         existing = reconcile_reported_job(db, claim.job_id)

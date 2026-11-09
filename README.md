@@ -37,7 +37,7 @@ What separates this project from a standard CRUD API:
 | **TOCTOU-safe enrollment** | Application-level pre-checks for friendly `409`s, plus a database `UNIQUE(student_id, course_offering_id)` constraint as the final arbiter — proven correct under interleaved transactions. |
 | **PostgreSQL as source of truth** | Every status read comes from PostgreSQL. Redis is a disposable cache: killing it never fails a request. |
 | **RBAC** | JWT auth with three roles (`admin` / `user` / `guest`). Users are scoped to their own linked student record via `user_id` filtering at the query level, not by post-filtering. |
-| **Rate limiting** | `slowapi` limits on register/login. Storage defaults to Redis (shared across replicas) with automatic in-memory fallback if Redis is unreachable. |
+| **Rate limiting** | `slowapi` limits on register/login. Development can fall back to memory; production fails closed if its shared Redis limiter is unavailable. |
 | **Timing-safe login** | Non-existent emails run a dummy Argon2 verification so response time cannot reveal which emails exist. |
 
 ---
@@ -110,7 +110,7 @@ What separates this project from a standard CRUD API:
 
 ## Testing
 
-**206 tests**, including integration tests that run against a real PostgreSQL instance:
+**221 tests**, including integration tests that run against a real PostgreSQL instance:
 
 ```powershell
 uv run pytest -q
@@ -192,6 +192,17 @@ uv run python -m app.cli create-admin
 | `job_retry_base_seconds` | 5 | Backoff base (`5, 10, 20s`) |
 | `worker_retry_attempts` | 3 | Worker retries on transient DB errors |
 | `RATE_LIMIT_STORAGE_URI` | `memory://` | `redis://…` to share limits across replicas |
+| `RATE_LIMIT_FAIL_CLOSED` | `false` | Must be `true` in production; startup fails if the shared limiter is unavailable |
+| `CORS_ORIGINS` | `[]` | JSON list of trusted browser origins; required in production |
+
+### Production checklist
+
+- Set `APP_ENVIRONMENT=production`, a unique `SECRET_KEY`, and a JSON `CORS_ORIGINS` list.
+- Keep `RATE_LIMIT_FAIL_CLOSED=true`; Redis is then part of the production readiness check at `/health/ready`.
+- Place the API behind a TLS-terminating reverse proxy and restrict port `8000` to that proxy.
+- Configure tested PostgreSQL backups and restore drills before accepting production data.
+- Pin the base and `uv` images to approved immutable digests in the deployment pipeline.
+- Before validating `fk_job_owner_id_users`, remediate any legacy `job.owner_id` values that do not exist in `users`; the current migration intentionally preserves them for audit.
 
 ### API quick reference
 

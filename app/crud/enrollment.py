@@ -62,7 +62,7 @@ def create_enrollment(db: Session, enrollment: EnrollmentCreate) -> Enrollment:
     except DataError:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid enrollment data provided",
         )
 
@@ -81,8 +81,24 @@ def update_enrollment(
         )
 
     if enrollment_update.student_id is not None:
+        statement_student = select(Student).where(
+            Student.id == enrollment_update.student_id
+        )
+        if db.execute(statement_student).scalar_one_or_none() is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Student not found",
+            )
         enrollment.student_id = enrollment_update.student_id
     if enrollment_update.course_offering_id is not None:
+        statement_offering = select(CourseOffering).where(
+            CourseOffering.id == enrollment_update.course_offering_id
+        )
+        if db.execute(statement_offering).scalar_one_or_none() is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Course offering not found",
+            )
         enrollment.course_offering_id = enrollment_update.course_offering_id
     if enrollment_update.enrollment_code is not None:
         enrollment.enrollment_code = enrollment_update.enrollment_code
@@ -92,6 +108,12 @@ def update_enrollment(
         enrollment.is_active = enrollment_update.is_active
     if enrollment_update.is_withdrawn is not None:
         enrollment.is_withdrawn = enrollment_update.is_withdrawn
+
+    if enrollment.is_active and enrollment.is_withdrawn:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="is_active and is_withdrawn cannot both be true",
+        )
 
     try:
         db.commit()
@@ -106,7 +128,7 @@ def update_enrollment(
     except DataError:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid enrollment data provided",
         )
 

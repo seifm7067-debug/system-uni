@@ -22,7 +22,7 @@ def create_course(db: Session, course: CourseCreate) -> Course:
     except DataError:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid course data provided",
         )
 
@@ -56,7 +56,7 @@ def update_course(db: Session, course_update: CourseUpdate, course_id: int) -> C
     except DataError:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid course data provided",
         )
 

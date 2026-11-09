@@ -281,6 +281,20 @@ def test_health_endpoint():
     assert data["components"]["postgres"] == "healthy"
 
 
+def test_readiness_fails_when_production_rate_limit_redis_is_unavailable(monkeypatch):
+    from app.routers import health
+
+    monkeypatch.setattr(health.settings, "rate_limit_fail_closed", True)
+    monkeypatch.setattr(health, "check_redis_health", lambda: "healthy")
+    monkeypatch.setattr(health, "check_redis_url_health", lambda _url: "unhealthy")
+
+    response = client.get("/health/ready")
+
+    assert response.status_code == 503
+    assert response.json()["components"]["redis_cache"] == "healthy"
+    assert response.json()["components"]["rate_limit_storage"] == "unhealthy"
+
+
 def test_register_and_login():
     reg_resp = client.post(
         "/users/register",
@@ -818,6 +832,16 @@ def test_job_status_is_read_from_postgresql(setup_db):
 def test_job_status_admin_can_view_other_users_job(setup_db):
     """Scenario 6: Admin user (not owner) can view any job -> 200 OK"""
     db = setup_db
+    other_user = User(
+        username="job_owner_other",
+        email="job_owner_other@test.com",
+        password_hash=hash_password("password123"),
+        role=UserRole.USER,
+    )
+    db.add(other_user)
+    db.commit()
+    db.refresh(other_user)
+
     # User 1 is Admin from setup_db
     token = create_access_token(user_id=1)
     headers = {"Authorization": f"Bearer {token}"}
@@ -828,7 +852,7 @@ def test_job_status_admin_can_view_other_users_job(setup_db):
         Job(
             job_id=job_id,
             status="completed",
-            owner_id=888,
+            owner_id=other_user.id,
             report_type="transcript",
             target_id=12,
             job_version=1,
@@ -842,7 +866,7 @@ def test_job_status_admin_can_view_other_users_job(setup_db):
     assert resp.json() == {
         "job_id": job_id,
         "status": "completed",
-        "owner_id": 888,
+        "owner_id": other_user.id,
         "report_type": "transcript",
         "target_id": 12,
         "result": report_result,

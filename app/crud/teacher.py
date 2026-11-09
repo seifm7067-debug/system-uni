@@ -22,7 +22,7 @@ def create_teacher(db: Session, teacher: TeacherCreate) -> Teacher:
     except DataError:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid teacher data provided",
         )
 
@@ -56,7 +56,7 @@ def update_teacher(
     except DataError:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid teacher data provided",
         )
 

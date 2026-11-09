@@ -2,7 +2,8 @@ from importlib import import_module
 from logging.config import fileConfig
 
 from alembic import context
-from app.database import DATABASE_URL, Base
+from app.config import settings
+from app.database import Base
 from app.models import *
 from sqlalchemy import create_engine, pool
 
@@ -35,7 +36,7 @@ def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
 
     context.configure(
-        url=DATABASE_URL,
+        url=settings.database_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -49,7 +50,7 @@ def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
 
     connectable = create_engine(
-        DATABASE_URL,
+        settings.database_url,
         poolclass=pool.NullPool,
     )
 

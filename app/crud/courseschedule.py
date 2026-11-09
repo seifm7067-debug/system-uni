@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 def _ensure_time_order(start_time, end_time) -> None:
     if end_time <= start_time:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="end_time must be strictly after start_time",
         )
 
@@ -33,7 +33,7 @@ def create_course_schedule(
     except DataError:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid course schedule data",
         )
 
@@ -51,8 +51,16 @@ def update_course_schedule(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course schedule not found"
         )
 
-    start_time = schedule_update.start_time or course_schedule.start_time
-    end_time = schedule_update.end_time or course_schedule.end_time
+    start_time = (
+        schedule_update.start_time
+        if schedule_update.start_time is not None
+        else course_schedule.start_time
+    )
+    end_time = (
+        schedule_update.end_time
+        if schedule_update.end_time is not None
+        else course_schedule.end_time
+    )
     _ensure_time_order(start_time, end_time)
 
     if schedule_update.day is not None:
@@ -81,7 +89,7 @@ def update_course_schedule(
     except DataError:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid course schedule data",
         )
 

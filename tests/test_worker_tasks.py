@@ -485,3 +485,65 @@ def test_claim_with_retry_does_not_retry_unexpected_errors(job_db, monkeypatch):
         runner._claim_with_retry()
 
     assert len(attempts) == 1
+
+
+def test_worker_aborts_when_transcript_ownership_is_lost(job_db, monkeypatch):
+    db = job_db()
+    create_job(db)
+    claim = tasks.claim_next_job(db)
+    assert claim is not None
+
+    monkeypatch.setattr(
+        tasks,
+        "generate_student_transcript",
+        lambda *_: (_ for _ in ()).throw(
+            tasks.TranscriptOwnershipLost("lease lost mid-flight")
+        ),
+    )
+
+    result = tasks.process_claimed_report(claim)
+
+    assert result == {"status": "already_processing", "job_id": "job-1"}
+    db.expire_all()
+    job = db.get(Job, "job-1")
+    assert job.status == "processing"
+    db.close()
+
+
+def test_worker_adopts_winner_report_when_transcript_ownership_is_lost(
+    job_db, monkeypatch
+):
+    db = job_db()
+    create_job(db)
+    claim = tasks.claim_next_job(db)
+    assert claim is not None
+
+    winning_transcript = {"student_id": 10, "winner": "worker-b"}
+
+    def simulate_takeover_and_raise(*_):
+        winner_db = job_db()
+        try:
+            winner_db.add(Report(job_id="job-1", result=winning_transcript))
+            winner_db.commit()
+        finally:
+            winner_db.close()
+        raise tasks.TranscriptOwnershipLost("lease lost mid-flight")
+
+    monkeypatch.setattr(
+        tasks,
+        "generate_student_transcript",
+        simulate_takeover_and_raise,
+    )
+
+    result = tasks.process_claimed_report(claim)
+
+    assert result == {
+        "status": "completed",
+        "job_id": "job-1",
+        "result": winning_transcript,
+    }
+    db.expire_all()
+    job = db.get(Job, "job-1")
+    assert job.status == "completed"
+    assert job.report.result == winning_transcript
+    db.close()

@@ -42,7 +42,7 @@ def upgrade() -> None:
         "enrollment", sa.Column("cenrollment_code", sa.String(length=50), nullable=True)
     )
     op.execute(
-        "UPDATE enrollment SET cenrollment_code = 'LEGACY-ENR-' || id WHERE cenrollment_code IS NULL"
+        "UPDATE enrollment SET cenrollment_code = 'LEGACY-ENR-' || CAST(id AS TEXT) WHERE cenrollment_code IS NULL"
     )
     op.alter_column("enrollment", "cenrollment_code", nullable=False)
     op.drop_constraint(
@@ -58,7 +58,7 @@ def upgrade() -> None:
     op.add_column("student", sa.Column("age", sa.Integer(), nullable=True))
     op.add_column("student", sa.Column("email", sa.String(length=150), nullable=True))
     op.execute(
-        "UPDATE student SET email = 'legacy-student-' || id || '@invalid.local' WHERE email IS NULL"
+        "UPDATE student SET email = 'legacy-student-' || CAST(id AS TEXT) || '@invalid.local' WHERE email IS NULL"
     )
     op.alter_column("student", "email", nullable=False)
     op.create_unique_constraint(None, "student", ["email"])

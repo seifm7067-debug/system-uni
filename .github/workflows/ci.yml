@@ -41,7 +41,7 @@ jobs:
           python-version: "3.14"
 
       - name: Install Dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Run Ruff Linter
         run: uv run ruff check .
@@ -52,14 +52,22 @@ jobs:
       - name: Run Bandit Security Scan
         run: uv run bandit -q -r app
 
-      - name: Run Alembic Upgrade on Postgres
+      - name: Build Legacy Schema on Postgres
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgrespassword@localhost:5432/system_uni_test
-          SECRET_KEY: testsecretkeyforcireplacewithlongvalue1234567890
-        run: uv run alembic upgrade head
+          SECRET_KEY: CI_valid_secret_key_4mQ8x2L7pR5vN9sT3wY6zA1bC0dE
+        run: uv run alembic upgrade 261ef2b9bad0
+
+      - name: Verify Migration with Existing Enrollment Data
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgrespassword@localhost:5432/system_uni_test
+          SECRET_KEY: CI_valid_secret_key_4mQ8x2L7pR5vN9sT3wY6zA1bC0dE
+          RUN_MIGRATION_COMPATIBILITY_TESTS: "1"
+        run: uv run pytest -v tests/test_postgres_migrations.py::test_enrollment_code_migration_preserves_existing_rows
 
       - name: Run Pytest Suite
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgrespassword@localhost:5432/system_uni_test
-          SECRET_KEY: testsecretkeyforcireplacewithlongvalue1234567890
+          SECRET_KEY: CI_valid_secret_key_4mQ8x2L7pR5vN9sT3wY6zA1bC0dE
+          RUN_POSTGRES_INTEGRATION_TESTS: "1"
         run: uv run pytest -v

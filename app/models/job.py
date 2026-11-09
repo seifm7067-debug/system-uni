@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from app.database import Base
-from sqlalchemy import DateTime, Index, Integer, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -25,7 +25,9 @@ class Job(Base):
         server_default="queued",
         index=True,
     )
-    owner_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
     # The user who requested a job is not necessarily the process executing it.
     # This token identifies one particular execution for lease fencing.
     worker_token: Mapped[str | None] = mapped_column(

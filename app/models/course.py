@@ -19,7 +19,7 @@ class Course(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     department_id: Mapped[int] = mapped_column(
-        ForeignKey("department.id"), nullable=True
+        ForeignKey("department.id"), nullable=False
     )
     department: Mapped[Department] = relationship(
         "Department", back_populates="courses"

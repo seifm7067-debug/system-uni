@@ -41,9 +41,13 @@ def create_admin(email: str | None, username: str | None, password: str | None) 
     db: Session = SessionLocal()
     try:
         # Check for existing user with same email or username (Idempotent check)
-        existing_user = db.execute(
-            select(User).where((User.email == email) | (User.username == username))
-        ).scalar_one_or_none()
+        existing_user = (
+            db.execute(
+                select(User).where((User.email == email) | (User.username == username))
+            )
+            .scalars()
+            .first()
+        )
 
         if existing_user:
             print(

@@ -23,8 +23,10 @@ def upgrade() -> None:
         "course", "department_id", existing_type=sa.INTEGER(), nullable=True
     )
     op.add_column(
-        "enrollment", sa.Column("enrollment_code", sa.String(length=50), nullable=False)
+        "enrollment", sa.Column("enrollment_code", sa.String(length=50), nullable=True)
     )
+    op.execute("UPDATE enrollment SET enrollment_code = cenrollment_code")
+    op.alter_column("enrollment", "enrollment_code", nullable=False)
     op.drop_column("enrollment", "cenrollment_code")
 
 
@@ -36,9 +38,11 @@ def downgrade() -> None:
             "cenrollment_code",
             sa.VARCHAR(length=50),
             autoincrement=False,
-            nullable=False,
+            nullable=True,
         ),
     )
+    op.execute("UPDATE enrollment SET cenrollment_code = enrollment_code")
+    op.alter_column("enrollment", "cenrollment_code", nullable=False)
     op.drop_column("enrollment", "enrollment_code")
     op.alter_column(
         "course", "department_id", existing_type=sa.INTEGER(), nullable=False

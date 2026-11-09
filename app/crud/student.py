@@ -42,7 +42,7 @@ def create_student(db: Session, student: StudentCreate) -> Student:
     except DataError:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid student data provided",
         )
 
@@ -94,7 +94,7 @@ def update_student(
     except DataError:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid student data provided",
         )
     # Invalidate only after the commit succeeded so a concurrent

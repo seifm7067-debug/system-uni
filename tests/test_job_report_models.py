@@ -4,6 +4,7 @@ import pytest
 from app.database import Base
 from app.models.job import Job
 from app.models.report import Report
+from app.models.user import User, UserRole
 from sqlalchemy import create_engine, event
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
@@ -28,6 +29,19 @@ def db():
     session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = session_factory()
     try:
+        session.add_all(
+            [
+                User(
+                    id=owner_id,
+                    username=f"job-owner-{owner_id}",
+                    email=f"job-owner-{owner_id}@test.local",
+                    password_hash="not-used-in-model-tests",
+                    role=UserRole.USER,
+                )
+                for owner_id in (1, 2, 5, 42)
+            ]
+        )
+        session.commit()
         yield session
     finally:
         session.close()
@@ -57,6 +71,22 @@ def test_create_job_and_fields(db):
     assert job.report_type == "transcript"
     assert job.target_id == 10
     assert job.report is None
+
+
+def test_job_owner_must_exist(db):
+    db.add(
+        Job(
+            job_id="orphan-job",
+            owner_id=999,
+            report_type="transcript",
+            target_id=10,
+        )
+    )
+
+    with pytest.raises(IntegrityError):
+        db.commit()
+
+    db.rollback()
 
 
 def test_one_to_one_job_report_relationship(db):
